@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة ومتابعة المزرعة</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --danger: #d32f2f;
+            --warning: #f57c00;
+            --bg: #f4f6f8;
+            --card: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 15px;
+            color: #333;
+        }
+
+        .header {
+            background-color: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .datetime-bar {
+            text-align: center;
+            background: #e0f2f1;
+            padding: 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            color: #00695c;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+
+        .shift-bar {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #bbdefb;
+        }
+
+        .doctor-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #e8f5e9;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #c8e6c9;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: white;
+            font-weight: bold;
+        }
+        .online { background-color: #388e3c; }
+        .offline { background-color: var(--danger); }
+
+        .call-btn {
+            background-color: var(--danger);
+            color: white;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-danger { background-color: var(--danger); }
+        .btn-warning { background-color: var(--warning); }
+        .btn-info { background-color: #0288d1; color: white; }
+
+        .chat-box {
+            height: 180px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 8px;
+            background: #fafafa;
+            margin-bottom: 10px;
+        }
+
+        .chat-msg {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: #e3f2fd;
+            font-size: 0.95rem;
+        }
+
+        .chat-msg small {
+            display: block;
+            color: #777;
+            font-size: 0.75rem;
+            margin-top: 3px;
+        }
+
+        /* تصميم نافذة الإنذار الصوتي الحديثة */
+        .alarm-banner {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 5%;
+            right: 5%;
+            z-index: 9999;
+            background-color: #d32f2f;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            text-align: center;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.03); }
+        }
+
+        .footer-signature {
+            text-align: center;
+            padding: 15px;
+            color: #555;
+            font-weight: bold;
+            font-size: 0.95rem;
+            border-top: 1px dashed #ccc;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- بنر التنبيه الصوتي الفوري -->
+    <div id="alarmBanner" class="alarm-banner">
+        <h3 id="alarmTitle" style="margin:0 0 10px 0; font-size:1.3rem;">🔊 جرس ينبه الآن!</h3>
+        <p id="alarmBody" style="margin:0 0 15px 0;">جارِ تشغيل صوت الإنذار العالي...</p>
+        <button onclick="stopLoudBell()" class="btn" style="background:#fff; color:#d32f2f; width:auto; padding:8px 25px;">إيقاف الجرس 🔕</button>
+    </div>
+
+    <div class="header">
+        <h2 style="margin:0;">🐔 نظام متابعة العنبر الميداني</h2>
+        <small>تحديث تلقائي لحظي</small>
+    </div>
+
+    <!-- شريط التاريخ والزمن -->
+    <div class="datetime-bar" id="datetimeDisplay">
+        جاري تحميل الوقت والتاريخ...
+    </div>
+
+    <!-- 1. قسم مسئول الوردية -->
+    <div class="card shift-bar" id="shiftCard">
+        <h3>👤 بيانات مسئول الوردية الحالي</h3>
+        
+        <div id="shiftFormContainer">
+            <div class="form-group">
+                <label>اسم المسؤول:</label>
+                <input type="text" id="shiftName" placeholder="اكتب اسمك هنا (مثال: بني فون)">
+            </div>
+            <div class="form-group">
+                <label>رقم الهاتف:</label>
+                <input type="tel" id="shiftPhone" placeholder="رقم هاتفك">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>زمن دخول الوردية:</label>
+                    <input type="time" id="shiftTime">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>عدد ساعات العمل:</label>
+                    <input type="number" id="shiftHours" placeholder="مثال: 8">
+                </div>
+            </div>
+            <button class="btn btn-info" onclick="saveShiftInfo()">بدء وتسجيل الوردية</button>
+        </div>
+
+        <div id="activeShiftDisplay" style="display: none; background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #90caf9;">
+            <p><b>👤 المسؤول الحالي:</b> <span id="dspName">-</span></p>
+            <p><b>📱 الهاتف:</b> <span id="dspPhone">-</span></p>
+            <p><b>⏰ وقت الدخول:</b> <span id="dspTime">-</span> | <b>ساعات العمل:</b> <span id="dspHours">-</span> ساعات</p>
+            <button class="btn btn-danger" onclick="endShift()">🏁 إنهاء الوردية الحالية</button>
+        </div>
+    </div>
+
+    <!-- 2. قسم حساب الأيام التلقائي للدورة -->
+    <div class="card" style="border: 2px solid #0288d1;">
+        <h3 style="color: #0288d1;">📅 عداد أيام دورة الكتاكيت</h3>
+        <div class="form-group">
+            <label>تحديد تاريخ بدء الدورة (أو تعديله عند الحاجة):</label>
+            <input type="date" id="cycleStartDateInput" onchange="updateCycleDate(this.value)">
+        </div>
+        <p id="cycleStatus" style="font-size: 1.1rem; font-weight: bold; text-align: center; background: #e1f5fe; padding: 10px; border-radius: 8px;">
+            اليوم الحالي من الدورة: جاري الحساب...
+        </p>
+        <button class="btn btn-danger" onclick="endCycle()">🏁 انتهت الدورة وبدء دورة جديدة</button>
+    </div>
+
+    <!-- جرس الإفطار وجرس انتهاء الوردية -->
+    <div class="card" style="background: #fff8e1;">
+        <h3>🔔 التنبيهات والأجراس المسموعة</h3>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-warning" onclick="ringLoudBell('إفطار 🍲')">🔔 جرس 🔔 الإفطار</button>
+            <button class="btn btn-danger" onclick="ringLoudBell('انتهاء الوردية ⏰')">⏰ جرس ⏰ انتهاء الوردية</button>
+        </div>
+    </div>
+
+    <!-- حالة اتصال الطبيب والاتصال السريع -->
+    <div class="doctor-status">
+        <div>
+            <strong>حالة الدكتور:</strong> 
+            <span id="docStatusBadge" class="status-badge offline">فحص...</span>
+        </div>
+        <div style="display: flex; gap: 5px;">
+            <a href="tel:0123456789" id="docCallBtn" class="call-btn">📞 الدكتور</a>
+            <a href="tel:0112086268" id="managerCallBtn" class="call-btn" style="background-color: var(--warning);">📞 المدير</a>
+        </div>
+    </div>
+
+    <!-- 3. لوحة البيانات الحية -->
+    <div class="card">
+        <h3>📊 تسجيل البيانات اليومية</h3>
+        <form id="dailyDataForm">
+            <div class="form-group">
+                <label>درجة الحرارة الحاليّة (°C):</label>
+                <input type="number" id="tempInput" placeholder="مثال: 32" required>
+            </div>
+            <div class="form-group">
+                <label>عدد النافق اليومي:</label>
+                <input type="number" id="deadInput" value="0" required>
+            </div>
+            <div class="form-group">
+                <label>استهلاك العلف (كجم):</label>
+                <input type="number" id="feedInput" placeholder="مثال: 50" required>
+            </div>
+            <button type="submit" class="btn">حفظ وتحديث البيانات اللحظية</button>
+        </form>
+    </div>
+
+    <!-- 4. زر الطوارئ السريع والكهرباء (SOS) -->
+    <div class="card" style="border: 2px solid var(--danger);">
+        <h3 style="color: var(--danger);">🚨 حالات الطوارئ والإنذار</h3>
+        <p style="font-size: 0.85rem; color: #666;">إرسال إنذار عاجل فوراً لجميع الأجهزة والمسئولين.</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="btn btn-warning" onclick="sendPowerOutageAlert()">⚡ انقطع التيار الكهربائي!</button>
+            <button class="btn btn-danger" onclick="sendEmergencyAlert()">🚨 إنذار طوارئ عام!</button>
+        </div>
+    </div>
+
+    <!-- 5. المحادثة والملاحظات الحية -->
+    <div class="card">
+        <h3>💬 الملاحظات والمحادثة الداخلية والإشعارات</h3>
+        <div class="chat-box" id="chatBox">
+            <div class="chat-msg"><b>النظام:</b> أهلاً بك، جاري تحميل الرسائل...</div>
+        </div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="msgInput" placeholder="اكتب ملاحظة..." onkeypress="handleKeyPress(event)">
+            <button class="btn" style="width: 30%;" onclick="sendMessage()">إرسال</button>
+        </div>
+    </div>
+
+    <!-- البصمة أسفل الشاشة -->
+    <div class="footer-signature">
+        ✨ تم التطوير بواسطة بني فون ✨
+    </div>
+
+    <script>
+        const DOCTOR_PHONE_NUMBER = "0123456789";  
+        const MANAGER_PHONE_NUMBER = "0112086268"; 
+
+        document.getElementById('docCallBtn').href = "tel:" + DOCTOR_PHONE_NUMBER;
+        document.getElementById('managerCallBtn').href = "tel:" + MANAGER_PHONE_NUMBER;
+
+        function updateClock() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('datetimeDisplay').innerText = "📅 " + now.toLocaleDateString('ar-EG', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyADPfcnocWYKRpGkvGgvHzkEYs-tqW7-KU",
+            authDomain: "bany-farm-system.firebaseapp.com",
+            databaseURL: "https://bany-farm-system-default-rtdb.firebaseio.com",
+            projectId: "bany-farm-system",
+            storageBucket: "bany-farm-system.firebasestorage.app",
+            messagingSenderId: "461707892440",
+            appId: "1:461707892440:web:4e550de5b270080fa869ad"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        let isDoctorOnline = false;
+        let currentShiftUser = "عامل";
+
+        const doctorPresenceRef = db.ref('presence/doctor');
+        doctorPresenceRef.on('value', (snapshot) => {
+            isDoctorOnline = snapshot.val() === true;
+            const badge = document.getElementById('docStatusBadge');
+            if (isDoctorOnline) {
+                badge.innerText = "متصل";
+                badge.className = "status-badge online";
+            } else {
+                badge.innerText = "غير متصل";
+                badge.className = "status-badge offline";
+            }
+        });
+
+        db.ref('current_shift').on('value', (snapshot) => {
+            const shiftData = snapshot.val();
+            const formContainer = document.getElementById('shiftFormContainer');
+            const displayContainer = document.getElementById('activeShiftDisplay');
+
+            if (shiftData && shiftData.active) {
+                currentShiftUser = shiftData.name;
+                formContainer.style.display = 'none';
+                displayContainer.style.display = 'block';
+
+                document.getElementById('dspName').innerText = shiftData.name;
+                document.getElementById('dspPhone').innerText = shiftData.phone || "غير محدد";
+                document.getElementById('dspTime').innerText = shiftData.entry_time || "--:--";
+                document.getElementById('dspHours').innerText = shiftData.hours || "--";
+            } else {
+                currentShiftUser = "عامل الوردية";
+                formContainer.style.display = 'block';
+                displayContainer.style.display = 'none';
+            }
+        });
+
+        function saveShiftInfo() {
+            const name = document.getElementById('shiftName').value.trim();
+            const phone = document.getElementById('shiftPhone').value.trim();
+            const time = document.getElementById('shiftTime').value;
+            const hours = document.getElementById('shiftHours').value;
+
+            if(!name) {
+                alert("يرجى إدخال اسم المسؤول لتسجيل الوردية!");
+                return;
+            }
+
+            db.ref('current_shift').set({
+                active: true,
+                name: name,
+                phone: phone,
+                entry_time: time,
+                hours: hours,
+                timestamp: Date.now()
+            }).then(() => {
+                db.ref('chat').push({
+                    sender: '👤 إدارة الورديات',
+                    text: `بدأ المسؤول (${name}) ورديته الآن.`,
+                    timestamp: Date.now()
+                });
+            });
+        }
+
+        function endShift() {
+            if(confirm("هل أنت متأكد من إنهاء ورديتك الحالية؟")) {
+                db.ref('current_shift').set({ active: false }).then(() => {
+                    db.ref('chat').push({
+                        sender: '👤 إدارة الورديات',
+                        text: `انتهت الوردية السابقة، بانتظار استلام المسؤول الجديد.`,
+                        timestamp: Date.now()
+                    });
+                });
+            }
+        }
+
+        const cycleRef = db.ref('cycle_info');
+        cycleRef.on('value', (snapshot) => {
+            let data = snapshot.val();
+            let startDate;
+            
+            if (!data || !data.start_date) {
+                startDate = Date.now();
+                cycleRef.set({ start_date: startDate });
+            } else {
+                startDate = data.start_date;
+            }
+
+            const dateObj = new Date(startDate);
+            const dateString = dateObj.toISOString().split('T')[0];
+            document.getElementById('cycleStartDateInput').value = dateString;
+
+            const diffTime = Math.abs(Date.now() - startDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            document.getElementById('cycleStatus').innerText = `🐔 اليوم رقم (${diffDays}) من دورة التسمين`;
+        });
+
+        function updateCycleDate(newDateStr) {
+            if(!newDateStr) return;
+            const newTimestamp = new Date(newDateStr).getTime();
+            cycleRef.set({ start_date: newTimestamp });
+        }
+
+        function endCycle() {
+            if(confirm("هل أنت متأكد من إنهاء الدورة الحالية وبدء دورة جديدة من اليوم؟")) {
+                cycleRef.set({ start_date: Date.now() });
+            }
+        }
+
+        // ==========================================
+        // 🔔 محرك الصوت الحقيقي العالي مع حلقة تكرار مستمرة
+        // ==========================================
+        let alarmInterval = null;
+        let audioCtx = null;
+
+        function ringLoudBell(bellType) {
+            // إظهار بنر التنبيه العلوي
+            document.getElementById('alarmTitle').innerText = `🔊 جرس تنبيه: [ ${bellType} ]`;
+            document.getElementById('alarmBody').innerText = `تم التفعيل بواسطة المسؤول: (${currentShiftUser})`;
+            document.getElementById('alarmBanner').style.display = 'block';
+
+            // إرسال للتشات
+            db.ref('chat').push({
+                sender: '🔔 جرس تنبيه عالي',
+                text: `🔊 تم إطلاق [ ${bellType} ] بواسطة المسؤول (${currentShiftUser})!`,
+                timestamp: Date.now()
+            });
+
+            // البدء فوراً في إطلاق الصوت المتكرر القوي بدون توقف
+            if (alarmInterval) clearInterval(alarmInterval);
+
+            alarmInterval = setInterval(() => {
+                try {
+                    if (!audioCtx) {
+                        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'sawtooth'; // صوت صفارة إنذار حاد وقوي جداً
+                    osc.frequency.setValueAtTime(950, audioCtx.currentTime); // تردد عالي
+                    osc.frequency.exponentialRampToValueAtTime(450, audioCtx.currentTime + 0.3); // تغيير التردد ليشبه صفارة الإنذار الحقيقية
+
+                    gain.gain.setValueAtTime(1.5, audioCtx.currentTime); // رفع الصوت لأقصى درجة
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                } catch(e) {
+                    console.log("Audio Error:", e);
+                }
+            }, 400); // تكرار الرنين كل 400 مللي ثانية بدون توقف
+        }
+
+        // إيقاف الجرس الصوتي وإغلاق التنبيه
+        function stopLoudBell() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+            document.getElementById('alarmBanner').style.display = 'none';
+        }
+
+        function sendPowerOutageAlert() {
+            ringLoudBell('طوارئ كهرباء ⚡');
+            db.ref('chat').push({
+                sender: '⚡ طوارئ كهرباء',
+                text: `⚡ انقطع التيار الكهربائي في العنبر! بواسطة: ${currentShiftUser}`,
+                timestamp: Date.now()
+            });
+        }
+
+        function sendEmergencyAlert() {
+            ringLoudBell('طوارئ عامة 🚨');
+            db.ref('chat').push({
+                sender: '🚨 طوارئ عامة',
+                text: `🚨 تنبيه طوارئ عاجل من: ${currentShiftUser}`,
+                timestamp: Date.now()
+            });
+        }
+
+        document.getElementById('dailyDataForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const temp = document.getElementById('tempInput').value;
+            const dead = document.getElementById('deadInput').value;
+            const feed = document.getElementById('feedInput').value;
+
+            db.ref('daily_logs').push({
+                shift_user: currentShiftUser,
+                temperature: temp,
+                mortality: dead,
+                feed_consumed: feed,
+                timestamp: Date.now()
+            }).then(() => {
+                db.ref('chat').push({
+                    sender: '📊 سجل بيانات',
+                    text: `تسجيل جديد بواسطة (${currentShiftUser}) - الحرارة: ${temp}°C، النافق: ${dead}، العلف: ${feed}كجم`,
+                    timestamp: Date.now()
+                });
+                this.reset();
+            });
+        });
+
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const textValue = input.value.trim();
+
+            if (textValue !== "") {
+                db.ref('chat').push({
+                    sender: currentShiftUser,
+                    text: textValue,
+                    timestamp: Date.now()
+                }).then(() => {
+                    input.value = "";
+                });
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        const chatBox = document.getElementById('chatBox');
+        db.ref('chat').limitToLast(20).on('value', (snapshot) => {
+            chatBox.innerHTML = ""; 
+            if (!snapshot.exists()) {
+                chatBox.innerHTML = '<div class="chat-msg"><b>النظام:</b> لا توجد ملاحظات بعد.</div>';
+                return;
+            }
+
+            snapshot.forEach((childSnapshot) => {
+                const msg = childSnapshot.val();
+                const newMsg = document.createElement('div');
+                newMsg.className = 'chat-msg';
+                const time = new Date(msg.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                newMsg.innerHTML = `<b>${msg.sender}:</b> ${msg.text} <small>${time}</small>`;
+                chatBox.appendChild(newMsg);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    </script>
+</body>
+</html>
